@@ -1,0 +1,147 @@
+---
+title: "Impact of Severe Weather Events on Public Health and Economy"
+author: "Ahlam Saani"
+date: "2025-11-24"
+output: html_document
+---
+---
+title: "Impact of Severe Weather Events on Public Health and Economy"
+author: "Your Name"
+date: "2024-11-24"
+output: html_document
+---
+
+## Synopsis
+
+This analysis explores the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database to determine which types of severe weather events are most harmful to population health and have the greatest economic consequences. The database contains information on major storms and weather events from 1950 to November 2011, including fatalities, injuries, and property damage estimates. We analyzed the data to identify the top weather events causing health impacts (fatalities and injuries) and economic damage (property and crop damage). The results show that tornadoes are the most harmful to population health, causing the highest combined fatalities and injuries. For economic consequences, floods cause the greatest total damage when combining property and crop losses. These findings can help government and municipal managers prioritize resources and prepare for the most impactful severe weather events. The analysis was conducted using R and follows reproducible research principles with all code and data processing steps documented.
+
+## Data Processing
+
+### Loading Required Libraries
+
+First, we load the necessary R packages for data manipulation and visualization.
+```{r setup, message=FALSE, warning=FALSE}
+# Install packages if you don't have them
+# Uncomment these lines if needed:
+# install.packages("dplyr")
+# install.packages("ggplot2")
+
+library(dplyr)
+library(ggplot2)
+```
+
+### Downloading and Reading the Data
+
+We download the storm data file from the course website and read it directly from the compressed format.
+```{r load_data, cache=TRUE}
+# Download the data file if it doesn't exist
+if(!file.exists("stormData.csv.bz2")) {
+    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",
+                  destfile = "stormData.csv.bz2")
+}
+
+# Read the data directly from the compressed file
+storm_data <- read.csv("stormData.csv.bz2")
+
+# Check the structure of the data
+dim(storm_data)
+head(storm_data, 3)
+```
+
+### Processing Data for Health Impact Analysis
+
+We calculate total health impact by summing fatalities and injuries for each event type.
+```{r health_processing}
+# Select only the columns we need for health analysis
+health_data <- storm_data %>%
+    select(EVTYPE, FATALITIES, INJURIES) %>%
+    group_by(EVTYPE) %>%
+    summarize(
+        Total_Fatalities = sum(FATALITIES, na.rm = TRUE),
+        Total_Injuries = sum(INJURIES, na.rm = TRUE),
+        Total_Health_Impact = Total_Fatalities + Total_Injuries
+    ) %>%
+    arrange(desc(Total_Health_Impact)) %>%
+    head(10)
+
+# Display the top 10 events
+print(health_data)
+```
+
+### Processing Data for Economic Impact Analysis
+
+We process property and crop damage data, converting the alphabetic exponents to numeric values.
+```{r economic_processing}
+# Function to convert damage exponents to multipliers
+convert_exponent <- function(exp_value) {
+    exp_value <- toupper(as.character(exp_value))
+    ifelse(exp_value == "K", 1000,
+    ifelse(exp_value == "M", 1000000,
+    ifelse(exp_value == "B", 1000000000,
+    ifelse(exp_value == "H", 100,
+    ifelse(exp_value %in% c("0","1","2","3","4","5","6","7","8"), 10,
+    ifelse(exp_value == "", 1, 1))))))
+}
+
+# Calculate total economic damage
+economic_data <- storm_data %>%
+    select(EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP) %>%
+    mutate(
+        Property_Damage = PROPDMG * sapply(PROPDMGEXP, convert_exponent),
+        Crop_Damage = CROPDMG * sapply(CROPDMGEXP, convert_exponent),
+        Total_Damage = Property_Damage + Crop_Damage
+    ) %>%
+    group_by(EVTYPE) %>%
+    summarize(
+        Total_Property_Damage = sum(Property_Damage, na.rm = TRUE),
+        Total_Crop_Damage = sum(Crop_Damage, na.rm = TRUE),
+        Total_Economic_Impact = sum(Total_Damage, na.rm = TRUE)
+    ) %>%
+    arrange(desc(Total_Economic_Impact)) %>%
+    head(10)
+
+# Display the top 10 events
+print(economic_data)
+```
+
+## Results
+
+### Question 1: Events Most Harmful to Population Health
+
+The following figure shows the top 10 weather event types that caused the most combined fatalities and injuries across the United States.
+```{r health_plot, fig.width=10, fig.height=6}
+# Create bar plot for health impact
+ggplot(health_data, aes(x = reorder(EVTYPE, Total_Health_Impact), 
+                        y = Total_Health_Impact)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +
+    labs(title = "Top 10 Weather Events Most Harmful to Population Health",
+         x = "Event Type",
+         y = "Total Health Impact (Fatalities + Injuries)") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+**Finding:** Tornadoes are by far the most harmful weather event to population health, causing over 90,000 combined fatalities and injuries. This is followed by excessive heat and thunderstorm winds.
+
+### Question 2: Events with Greatest Economic Consequences
+
+The following figure shows the top 10 weather event types that caused the most economic damage (property and crop damage combined).
+```{r economic_plot, fig.width=10, fig.height=6}
+# Create bar plot for economic impact
+ggplot(economic_data, aes(x = reorder(EVTYPE, Total_Economic_Impact), 
+                          y = Total_Economic_Impact/1000000000)) +
+    geom_bar(stat = "identity", fill = "darkred") +
+    coord_flip() +
+    labs(title = "Top 10 Weather Events with Greatest Economic Consequences",
+         x = "Event Type",
+         y = "Total Economic Damage (Billions of USD)") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+**Finding:** Floods cause the greatest economic damage, exceeding $150 billion in total property and crop losses. Hurricanes/typhoons and tornadoes also cause significant economic damage.
+
+## Conclusion
+
+This analysis identified tornadoes as the most harmful weather event for population health and floods as the event with the greatest economic consequences. Municipal and government managers should prioritize preparedness and response resources for these event types.
